@@ -2,7 +2,7 @@
 #include <main.h>
 
 #define VERSION "0.01"
-#define HOSTNAME "TRS"
+#define HOSTNAME "Traslo"
 #define CONFIG "/conf.txt"
 
 // Webserver
