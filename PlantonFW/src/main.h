@@ -7,8 +7,10 @@
 #error Invalid platform
 #endif
 #include <DNSServer.h>
+
 #include <WiFiManager.h>
 
+#include <ArduinoJson.h>
 #include "SH1106Wire.h"
 #include "SSD1306Wire.h"
 #include "OLEDDisplayUi.h"
@@ -27,22 +29,15 @@
 #include "LittleFS.h" 
 
 
+
 void drawRssi(OLEDDisplay *display);
 int8_t getWifiQuality();
 void getUpdateTime();
-String getFooter();
-String getHeader(boolean refrsh);
 void WebStatus();
-void handleConfigure();
-void handleUpdateConfig() ;
 void handleSystemReset();
 void readSettings(bool log);
 void writeSettings();
-void redirectHome();
-void handleRead();
-void handleToggle();
 void handleWifiReset();
-void handleChart();
 void handleJSON();
 void handleJSONget();
 void handleESP();
@@ -50,7 +45,4 @@ void handleJsonConf();
 void LampOut();
 void drawFrame1(OLEDDisplay *display, OLEDDisplayUiState* state, int16_t x, int16_t y) ;
 void drawFrame2(OLEDDisplay *display, OLEDDisplayUiState* state, int16_t x, int16_t y) ;
-void drawFrame3(OLEDDisplay *display, OLEDDisplayUiState* state, int16_t x, int16_t y) ;
-void drawFrame4(OLEDDisplay *display, OLEDDisplayUiState* state, int16_t x, int16_t y) ;
-void drawFrame5(OLEDDisplay *display, OLEDDisplayUiState* state, int16_t x, int16_t y) ;
 void msOverlay(OLEDDisplay *display, OLEDDisplayUiState* state);
