@@ -29,13 +29,14 @@ String lastReportStatus = "";
 ESP8266WebServer server(WEBSERVER_PORT);
 ESP8266HTTPUpdateServer serverUpdater;
 
-String WEB_ACTIONS =  "<a class='w3-bar-item w3-button' href='/'><i class='fa fa-home'></i> Home</a>"
-                      "<a class='w3-bar-item w3-button' href='/configure'><i class='fa fa-cog'></i> Configura</a>"
-                      "<a class='w3-bar-item w3-button' href='/configureweather'><i class='fa fa-cloud'></i> Weather</a>"
-                      "<a class='w3-bar-item w3-button' href='/systemreset' onclick='return confirm(\"Do you want to reset to default settings?\")'><i class='fa fa-undo'></i> Reset Settings</a>"
-                      "<a class='w3-bar-item w3-button' href='/forgetwifi' onclick='return confirm(\"Do you want to forget to WiFi connection?\")'><i class='fa fa-wifi'></i> Forget WiFi</a>"
-                      "<a class='w3-bar-item w3-button' href='/update'><i class='fa fa-wrench'></i> Firmware Update</a>";
+String WEB_ACTIONS =  "<a class='w3-bar-item w3-button' href='/'><i class='fa fa-home'></i> Home</a><br>"
+                      "<a class='w3-bar-item w3-button' href='/configure'><i class='fa fa-rocket'></i> Missione</a><br>"
+                      "<a class='w3-bar-item w3-button' href='/configure'><i class='fa fa-cog'></i> Configura</a><br>"
+                      "<a class='w3-bar-item w3-button' href='/systemreset' onclick='return confirm(\"Cancellare le impostazioni?\")'><i class='fa fa-undo'></i> Reset Impostazioni</a>"
+                      "<a class='w3-bar-item w3-button' href='/forgetwifi' onclick='return confirm(\"Cancella impostazioni WiFi?\")'><i class='fa fa-wifi'></i> Reset WiFi</a>"
+                      "<a class='w3-bar-item w3-button' href='/update'><i class='fa fa-wrench'></i> Aggiornamento firmware</a><br>";
                       
+                    
 String CHANGE_FORM =  "<form class='w3-container' action='/updateconfig' method='get'><h2>Station Config:</h2>"
                       "<p><label>OctoPrint API Key (get from your server)</label><input class='w3-input w3-border w3-margin-bottom' type='text' name='octoPrintApiKey' value='%OCTOKEY%' maxlength='60'></p>"
                       "<p><label>OctoPrint Host Name (usually octopi)</label><input class='w3-input w3-border w3-margin-bottom' type='text' name='octoPrintHostName' value='%OCTOHOST%' maxlength='60'></p>"
@@ -204,7 +205,7 @@ void setup() {
   }
   flashLED(5, 500);
 
-  Serial.println("*** Leaving setup()");
+  Serial.println("Leaving setup");
 }
 
 void loop() {
@@ -308,19 +309,19 @@ String getHeader(boolean refresh) {
   html += "<link rel='stylesheet' href='https://www.w3schools.com/w3css/4/w3.css'>";
   html += "<link rel='stylesheet' href='https://www.w3schools.com/lib/w3-theme-" + themeColor + ".css'>";
   html += "<link rel='stylesheet' href='https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css'>";
+  html += "<style>html,body,h1,h2,h3,h4,h5 {font-family: 'Raleway', sans-serif}</style>";
   html += "</head><body>";
   html += "<nav class='w3-sidebar w3-bar-block w3-card' style='margin-top:88px' id='mySidebar'>";
-  html += "<div class='w3-container w3-theme-d2'>";
-  html += "<span onclick='closeSidebar()' class='w3-button w3-display-topright w3-large'><i class='fa fa-times'></i></span>";
-  html += "<div class='w3-cell w3-left w3-xxxlarge' style='width:60px'><i class='fa fa-cube'></i></div>";
-  html += "<div class='w3-padding'>Menu</div></div>";
+  html += "<div class='w3-container w3-theme'>";
+  html += "<span onclick='closeSidebar()' class='w3-button w3-display-topright'><i class='fa fa-times'></i></span><br>";
   html += menu;
   html += "</nav>";
-  html += "<header class='w3-top w3-bar w3-theme'><button class='w3-bar-item w3-button w3-xxxlarge w3-hover-theme' onclick='openSidebar()'><i class='fa fa-bars'></i></button><h2 class='w3-bar-item'>Printer Monitor</h2></header>";
+  html += "<header class='w3-top w3-bar w3-theme'><button class='w3-bar-item w3-button w3-xxxlarge w3-hover-theme' onclick='openSidebar()'><i class='fa fa-bars'></i></button></header>";
   html += "<script>";
   html += "function openSidebar(){document.getElementById('mySidebar').style.display='block'}function closeSidebar(){document.getElementById('mySidebar').style.display='none'}closeSidebar();";
   html += "</script>";
   html += "<br><div class='w3-container w3-large' style='margin-top:88px'>";
+  
   return html;
 }
 
@@ -332,13 +333,10 @@ String getFooter() {
   String html = "<br><br><br>";
   html += "</div>";
   html += "<footer class='w3-container w3-bottom w3-theme w3-margin-top'>";
-  if (lastReportStatus != "") {
-    html += "<i class='fa fa-external-link'></i> Report Status: " + lastReportStatus + "<br>";
-  }
   html += "<i class='fa fa-paper-plane-o'></i> Versione: " + String(VERSION) + "<br>";
   html += "<i class='fa fa-rss'></i> Potenza Segnale: ";
   html += String(rssi) + "% ";
-  html += "Rete: " + WiFi.SSID();
+  html += "<i class='fa fa-wifi'></i> Rete: " + WiFi.SSID();
   html += "</footer>";
   html += "</body></html>";
   return html;
@@ -411,20 +409,13 @@ void displayHome() {
   server.setContentLength(CONTENT_LENGTH_UNKNOWN);
   server.send(200, "text/html", "");
   server.sendContent(String(getHeader(true)));
-  html += "<div class='w3-cell-row' style='width:100%'><h2>Time: </h2></div><div class='w3-cell-row'>";
-  html += "<div class='w3-cell w3-container' style='width:100%'><p>";
-  html += "Host Name: <br>";
-  html += "<hr>";
-  html += "</p></div></div>";
+  html+="";
+  html += "<p>home page</p>";
   server.sendContent(html); // spit out what we got
-  html = "";
-  html += "<p>Please <a href='/configureweather'>Configure Weather</a> API</p>"; 
-  html += "<p>Weather Error: <strong> </strong></p>";  
-  server.sendContent(html); // spit out what we got
-  html = ""; // fresh start
-  server.sendContent(String(getFooter()));
+  html = getFooter();
+  server.sendContent(html);
   server.sendContent("");
   server.client().stop();
   digitalWrite(externalLight, HIGH);
-
+  
 }
