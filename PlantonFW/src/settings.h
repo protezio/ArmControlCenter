@@ -19,6 +19,7 @@
 
 //Tool
 #define LAMP_OUT D6
+#define PUMP_OUT D7
 #define SOIL_PIN A0
 const int SoilhumMax = 1024;
 const int SoilhumMin = 250;
@@ -29,6 +30,7 @@ const int SoilhumMin = 250;
 
 //File 
 #define CONFIG "/conf.txt"
+#define JCONFIG "/json.txt"
 
 //Display
 #define INVERT_DISPLAY true

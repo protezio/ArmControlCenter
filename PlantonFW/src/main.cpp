@@ -30,6 +30,7 @@ char daysOfTheWeek[7][12] = {"Sunday", "Monday", "Tuesday", "Wednesday", "Thursd
 day days[8];
 
 bool stateOUT;
+bool statePUMP;
 long timeEpoch;
 long lastEpoch;
 
@@ -93,6 +94,7 @@ Serial.println("Start");
 // pinout mode
 pinMode(LED_BUILTIN, OUTPUT);
 pinMode(LAMP_OUT, OUTPUT);
+pinMode(PUMP_OUT, OUTPUT);
 // display init
 display.init();
 if (INVERT_DISPLAY) {
@@ -139,8 +141,8 @@ server.on("/jsonconfig",handleJsonConf);
 server.on("/jsonGet", HTTP_POST, [](){
         handleJSONget();
     });
-server.on("/jsonconfig/post", HTTP_POST, [](){
-        handleJSONconfigPost();
+server.on("/jsonconfigGet", HTTP_POST, [](){
+        handleConfigJSONGet();
     });    
 
 // Start the server
@@ -157,7 +159,9 @@ display.display();
 
 Serial.println ("DateTime: "+ String (daysOfTheWeek[timeClient.getDay()]) +" " + timeClient.getFormattedTime() );
 LittleFS.begin();
-readSettings(false);
+
+updateConfig(readJsonSettings());
+
 
 }// end setup()
 
@@ -173,12 +177,13 @@ void loop() {
       DHThum = dht.readHumidity();
       SoilRawValue = analogRead(SOIL_PIN);
       SOILhum = map(SoilRawValue, SoilhumMin, SoilhumMax, 100.0, 0.0);
-      LampOut();
+      Out();
       tick();
       
     }
-      delay(remainingTimeBudget);
-      digitalWrite(LAMP_OUT,stateOUT);     
+      digitalWrite(LAMP_OUT,stateOUT);
+      digitalWrite(PUMP_OUT,statePUMP); 
+      delay(remainingTimeBudget);   
   }
  
    server.handleClient();
@@ -193,6 +198,7 @@ void handleJSON(){
   doc["Humidity"] = DHThum;
   doc["SoilHumidity"] =SOILhum;
   doc["Lamp"]= String(stateOUT ? "TRUE": "FALSE");
+  doc["Pump"]= String(statePUMP ? "TRUE": "FALSE");
   String buf;
   serializeJson(doc, buf);
   server.send(200, F("application/json"), buf);
@@ -220,59 +226,31 @@ void handleESP(){
 }
 
 void handleJSONget(){
+
  DynamicJsonDocument doc(512);
  deserializeJson(doc,server.arg("plain"));
- String lamp = doc["Lamp"];
- if (lamp.equals("TRUE")){ 
-   stateOUT = true;
-   Serial.println("lamp ON");
- }
- else{
-  stateOUT = false;
-  Serial.println("lamp OFF");
- }
- Serial.println(server.arg("plain"));
+  if (doc.containsKey("Lamp"))
+      stateOUT= toBool(doc["Lamp"]);
+  if (doc.containsKey("Pump"))
+      statePUMP= toBool(doc["Pump"]);
  server.send ( 200, "text/json", "{success:true}" );
 }
 
-
-void  handleJSONconfigPost(){
-  DynamicJsonDocument doc(512);
-  deserializeJson(doc,server.arg("plain"));
-  Serial.println(server.arg("plain"));
-  for (size_t i = 0; i <= 6; i++){
-    Serial.println("-------");
-    Serial.println("DAY: " +String(i));
-    Serial.println((String)doc[String(i)][0]);
-    Serial.println((String)doc[String(i)][1]);
-    Serial.println((String)doc[String(i)][2]);
-
-  };
-
-  
+void handleConfigJSONGet(){
+  writeJsonSettings(server.arg("plain"));
   server.send ( 200, "text/json", "{success:true}" );
+
 }
 
 void handleJsonConf(){
-  DynamicJsonDocument doc(512);
-  JsonObject root = doc.to<JsonObject>();
+  Serial.print("\nJSON Config Request...");
+  File fr = LittleFS.open(JCONFIG, "r");
   String buf;
-  for (size_t i = 0; i < 8; i++)
-  {
-    //JsonArray jday = root.createNestedArray(getDayName(i));
-    JsonArray jday = root.createNestedArray((String)i);
-    jday.add(days[i].isEnable);
-    jday.add(days[i].startHours);
-    jday.add(days[i].stopHours);
-  }
-
-  serializeJsonPretty(root, Serial);
-  serializeJson(doc, buf);
-  server.send(200, F("application/json"), buf);
-
+  buf = fr.readString();
+  fr.close();
+  server.send(200, F("application/json"), buf); 
+  
 }
-
-
 
 void getUpdateTime(){
   //Update the Time
@@ -280,143 +258,82 @@ void getUpdateTime(){
   lastEpoch = timeClient.getEpochTime();
 }
 
-void readSettings(bool log) {
-  Serial.println("Reading config file...");
-  if (LittleFS.exists(CONFIG) == false) {
-    Serial.println("Settings File does not yet exists.");
-    writeSettings();
+void writeJsonSettings(String buf){
+
+File f = LittleFS.open(JCONFIG, "w");
+  if (!f) {
+    Serial.print("\nFile open failed!");
+  } else {
+    Serial.print("\nSaving settings now...");
+    f.println(buf);
+    Serial.println("OK!");
+   // Serial.println(buf);
+    f.close();
+    updateConfig(readJsonSettings());
+  }
+}
+
+String readJsonSettings(){
+Serial.print("\nReading Json config file...");
+  if (LittleFS.exists(JCONFIG) == false) {
+    Serial.print("\nSettings File does not yet exists.");
+    return "";
+  }
+  File fr = LittleFS.open(JCONFIG, "r");
+  String buf;
+  buf = fr.readString();
+  Serial.print("OK!");
+  fr.close();
+  Serial.println(buf);
+  return buf;
+
+}
+
+void updateConfig(String buf){
+  Serial.println("\nUpdate Config");
+  DynamicJsonDocument doc(1024);
+  DeserializationError error = deserializeJson(doc, buf);
+  if (error){
+    Serial.println("\nDeserializationError");
     return;
   }
-  File fr = LittleFS.open(CONFIG, "r");
-  String line;
-  while(fr.available()) {
-    line = fr.readStringUntil('\n');
-   if(log) Serial.println(line);
-    if (line.indexOf("day1_isEnable=") >= 0) {
-      days[1].isEnable = (bool)line.substring(line.lastIndexOf("day1_isEnable=") + 14).toInt();
-    }
-    if (line.indexOf("day2_isEnable=") >= 0) {
-      days[2].isEnable =(bool)line.substring(line.lastIndexOf("day2_isEnable=") + 14).toInt();
-    }
-    if (line.indexOf("day3_isEnable=") >= 0) {
-      days[3].isEnable =(bool)line.substring(line.lastIndexOf("day3_isEnable=") + 14).toInt();
-    }
-    if (line.indexOf("day4_isEnable=") >= 0) {
-      days[4].isEnable =(bool)line.substring(line.lastIndexOf("day4_isEnable=") + 14).toInt();
-    }
-    if (line.indexOf("day5_isEnable=") >= 0) {
-      days[5].isEnable =(bool)line.substring(line.lastIndexOf("day5_isEnable=") + 14).toInt();
-      
-    }
-    if (line.indexOf("day6_isEnable=") >= 0) {
-      days[6].isEnable =(bool)line.substring(line.lastIndexOf("day6_isEnable=") + 14).toInt(); 
-    }
-    if (line.indexOf("day0_isEnable=") >= 0) {
-      days[0].isEnable =(bool)line.substring(line.lastIndexOf("day0_isEnable=") + 14).toInt();
-    }
-    if (line.indexOf("day1_start=") >= 0) {
-      days[1].startHours =line.substring(line.lastIndexOf("day1_start=")+11);
-    }
-    if (line.indexOf("day2_start=") >= 0) {
-      days[2].startHours =line.substring(line.lastIndexOf("day2_start=")+11);
-    }
-    if (line.indexOf("day3_start=") >= 0) {
-      days[3].startHours =line.substring(line.lastIndexOf("day3_start=")+11);
-    }
-    if (line.indexOf("day4_start=") >= 0) {
-      days[4].startHours =line.substring(line.lastIndexOf("day4_start=")+11);
-    }
-    if (line.indexOf("day5_start=") >= 0) {
-      days[5].startHours =line.substring(line.lastIndexOf("day5_start=")+11);
-    }
-    if (line.indexOf("day6_start=") >= 0) {
-      days[6].startHours =line.substring(line.lastIndexOf("day6_start=")+11);
-    }
-    if (line.indexOf("day0_start=") >= 0) {
-      days[0].startHours =line.substring(line.lastIndexOf("day0_start=")+11);
-    }
-
-    if (line.indexOf("day1_stop=") >= 0) {
-      days[1].stopHours =line.substring(line.lastIndexOf("day1_stop=")+10);
-    }
-    if (line.indexOf("day2_stop=") >= 0) {
-      days[2].stopHours =line.substring(line.lastIndexOf("day2_stop=")+10);
-    }
-    if (line.indexOf("day3_stop=") >= 0) {
-      days[3].stopHours =line.substring(line.lastIndexOf("day3_stop=")+10);
-    }
-    if (line.indexOf("day4_stop=") >= 0) {
-      days[4].stopHours =line.substring(line.lastIndexOf("day4_stop=")+10);
-    }
-    if (line.indexOf("day5_stop=") >= 0) {
-      days[5].stopHours =line.substring(line.lastIndexOf("day5_stop=")+10);
-    }
-    if (line.indexOf("day6_stop=") >= 0) {
-      days[6].stopHours =line.substring(line.lastIndexOf("day6_stop=")+10);
-    }
-    if (line.indexOf("day0_stop=") >= 0) {
-      days[0].stopHours =line.substring(line.lastIndexOf("day0_stop=")+10);
-    }
-
     
-  }
-  fr.close();
-   Serial.print("OK");
- 
+  for (int i = 0; i < 7; i++){
+  days[i].isEnable = (bool)doc[String(i)][0];
+  days[i].startHours =(String)doc[String(i)][1];
+  days[i].stopHours = (String)doc[String(i)][2];
+  /*Serial.print("\nDay: " + String(i));
+  Serial.print("\n Doc: ");
+  Serial.print((String)doc[String(i)][0] + ",");
+  Serial.print((String)doc[String(i)][1] + ",");
+  Serial.print( (String)doc[String(i)][2]);
+  Serial.print("\n System: ");
+  Serial.print((String)days[i].isEnable + ",");
+  Serial.print(days[i].startHours + ",");
+  Serial.print(days[i].stopHours);*/
+  };
+  
+
 }
 
-void writeSettings() {
-  // Save decoded message to SPIFFS file for playback on power up.
-  File f = LittleFS.open(CONFIG, "w");
-  if (!f) {
-    Serial.println("File open failed!");
-  } else {
-    Serial.println("Saving settings now...");
-    f.println("CONFIG");
-    f.println("day1_isEnable=" +String(days[1].isEnable));
-    f.println("day2_isEnable=" +String(days[2].isEnable));
-    f.println("day3_isEnable=" +String(days[3].isEnable));
-    f.println("day4_isEnable=" +String(days[4].isEnable));
-    f.println("day5_isEnable=" +String(days[5].isEnable));
-    f.println("day6_isEnable=" +String(days[6].isEnable));
-    f.println("day0_isEnable=" +String(days[0].isEnable));
-    f.println("day1_start="+days[1].startHours);
-    f.println("day2_start="+days[2].startHours);
-    f.println("day3_start="+days[3].startHours);
-    f.println("day4_start="+days[4].startHours);
-    f.println("day5_start="+days[5].startHours);
-    f.println("day6_start="+days[6].startHours);
-    f.println("day0_start="+days[0].startHours);
-    f.println("day1_stop="+days[1].stopHours);
-    f.println("day2_stop="+days[2].stopHours);
-    f.println("day3_stop="+days[3].stopHours);
-    f.println("day4_stop="+days[4].stopHours);
-    f.println("day5_stop="+days[5].stopHours);
-    f.println("day6_stop="+days[6].stopHours);
-    f.println("day0_stop="+days[0].stopHours);
-    Serial.println("Saved settings...");
-  }
-  
-  f.close();
-  readSettings(false);
-  
-}
 
-void LampOut(){
-  
-  int startHours =  days[timeClient.getDay()].startHours.substring(0,2).toInt();
+void Out(){  
+  //Serial.println("Lamp out");
+  //Serial.print("\nLampOut: ");
+ // Serial.println("\n Day: " + (String)timeClient.getDay());
+  int startHours=  days[timeClient.getDay()].startHours.substring(0,2).toInt();
   int startMins =  days[timeClient.getDay()].startHours.substring(3,5).toInt();
   int stopHours =  days[timeClient.getDay()].stopHours.substring(0,2).toInt();
-  int stopMins =  days[timeClient.getDay()].stopHours.substring(3,5).toInt();
- 
-  bool isEnable = days[timeClient.getDay()].isEnable;
-  
-  //stateOUT = isEnable;
-  if (timeClient.getHours() >= startHours && timeClient.getMinutes() >= startMins && isEnable){
-      stateOUT= true;
+  int stopMins  =  days[timeClient.getDay()].stopHours.substring(3,5).toInt();
+  int Hours = timeClient.getHours();
+  int Minute = timeClient.getMinutes();
+  bool isEnable =  (bool)days[timeClient.getDay()].isEnable;
+
+  if ((Hours > startHours || (Hours == startHours && Minute >= startMins))&& isEnable){
+      stateOUT = true;
   }
-  if (timeClient.getHours()>= stopHours && timeClient.getMinutes() >= stopMins && isEnable){
-      stateOUT= false;
+  if ((Hours>stopHours || (Hours == stopHours && Minute >= stopMins ))&& isEnable){
+      stateOUT = false;
   }
 
 }
@@ -445,3 +362,17 @@ void drawFrame2(OLEDDisplay *display, OLEDDisplayUiState* state, int16_t x, int1
   display->drawString(3 + x, 15 + y,"Soil Hum: " + String (SOILhum)+"%");
   display->drawString(3 + x, 35 + y,"Lamp    : " + String(stateOUT ? "ON": "OFF"));
 }
+
+bool toBool(String value){ 
+
+  if (value.equals("TRUE")||value.equals("true"))
+    return true;
+  if (value.equals("FALSE")||value.equals("false"))
+    return false;
+  return false;   
+}
+
+
+
+
+
