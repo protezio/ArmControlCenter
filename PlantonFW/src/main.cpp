@@ -33,6 +33,32 @@ bool stateOUT;
 long timeEpoch;
 long lastEpoch;
 
+String getDayName(int day){
+
+switch (day)
+{
+case 0: return "Sunday";
+    break;
+case 1: return "Monday";
+    break;
+case 2: return "Tuesday";
+    break;
+case 3: return "Wednesday";
+    break;
+case 4: return "Thursday";
+    break;
+case 5: return "Friday";
+    break;
+case 6: return "Saturday";
+    break;
+default:
+    return "";
+  break;
+}
+
+
+}
+
 void tick()
 {
   //toggle state
@@ -106,12 +132,16 @@ dht.begin();
 ticker.attach(0.2, tick);
 
 // web server config 
-server.on("/", WebStatus);
+//server.on("/", WebStatus);
 server.on("/json",handleJSON);
 server.on("/jsonesp",handleESP);
+server.on("/jsonconfig",handleJsonConf);
 server.on("/jsonGet", HTTP_POST, [](){
         handleJSONget();
     });
+server.on("/jsonconfig/post", HTTP_POST, [](){
+        handleJSONconfigPost();
+    });    
 
 // Start the server
 server.begin();
@@ -206,6 +236,50 @@ void handleJSONget(){
 }
 
 
+void  handleJSONconfigPost(){
+  DynamicJsonDocument doc(512);
+  deserializeJson(doc,server.arg("plain"));
+  Serial.println(server.arg("plain"));
+  for (size_t i = 0; i <= 6; i++){
+    Serial.println("-------");
+    Serial.println("DAY: " +String(i));
+    Serial.println((String)doc[String(i)][0]);
+    Serial.println((String)doc[String(i)][1]);
+    Serial.println((String)doc[String(i)][2]);
+
+  };
+
+  
+  server.send ( 200, "text/json", "{success:true}" );
+}
+
+void handleJsonConf(){
+  DynamicJsonDocument doc(512);
+  JsonObject root = doc.to<JsonObject>();
+  String buf;
+  for (size_t i = 0; i < 8; i++)
+  {
+    //JsonArray jday = root.createNestedArray(getDayName(i));
+    JsonArray jday = root.createNestedArray((String)i);
+    jday.add(days[i].isEnable);
+    jday.add(days[i].startHours);
+    jday.add(days[i].stopHours);
+  }
+
+  serializeJsonPretty(root, Serial);
+  serializeJson(doc, buf);
+  server.send(200, F("application/json"), buf);
+
+}
+
+
+
+void getUpdateTime(){
+  //Update the Time
+  timeClient.update();
+  lastEpoch = timeClient.getEpochTime();
+}
+
 void readSettings(bool log) {
   Serial.println("Reading config file...");
   if (LittleFS.exists(CONFIG) == false) {
@@ -287,6 +361,7 @@ void readSettings(bool log) {
     
   }
   fr.close();
+   Serial.print("OK");
  
 }
 
@@ -344,4 +419,29 @@ void LampOut(){
       stateOUT= false;
   }
 
+}
+
+void msOverlay(OLEDDisplay *display, OLEDDisplayUiState* state) {
+  display->setTextAlignment(TEXT_ALIGN_LEFT);
+  display->setFont(ArialMT_Plain_10);
+  String time = timeClient.getFormattedTime();
+  display->drawString(3, 0,String (DHTtemp)+" °C");
+  int wd = display->getStringWidth(time) + 2;
+  display->drawString(display->getWidth() - wd,0,time);
+ 
+ }
+
+void drawFrame1(OLEDDisplay *display, OLEDDisplayUiState* state, int16_t x, int16_t y) 
+{
+  display->setTextAlignment(TEXT_ALIGN_LEFT);
+  display->setFont(ArialMT_Plain_16);
+  display->drawString(3 + x, 15 + y,"Temp: " + String (DHTtemp)+" °C");
+  display->drawString(3 + x, 35 + y,"Hum:  " + String (DHThum)+"  %");
+}
+
+void drawFrame2(OLEDDisplay *display, OLEDDisplayUiState* state, int16_t x, int16_t y) {
+  display->setTextAlignment(TEXT_ALIGN_LEFT);
+  display->setFont(ArialMT_Plain_16);
+  display->drawString(3 + x, 15 + y,"Soil Hum: " + String (SOILhum)+"%");
+  display->drawString(3 + x, 35 + y,"Lamp    : " + String(stateOUT ? "ON": "OFF"));
 }
