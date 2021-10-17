@@ -106,17 +106,24 @@ Serial.println("Start");
 pinMode(LED_BUILTIN, OUTPUT);
 pinMode(LAMP_OUT, OUTPUT);
 pinMode(PUMP_OUT, OUTPUT);
+
 // display init
 display.init();
 if (INVERT_DISPLAY) {
    display.flipScreenVertically();
 }
-display.setFont(ArialMT_Plain_16);
-display.setTextAlignment(TEXT_ALIGN_CENTER);
+
+
+
 display.setContrast(255);
-display.drawString(64, 5, "PLANTON\nV" + String(VERSION));
+
+display.clear();
+display.setTextAlignment(TEXT_ALIGN_CENTER);
+display.setFont(ArialMT_Plain_10);
+display.drawString(64, 15, "booting..."); 
 display.display();
-delay(500);
+delay(1000);
+
 ui.setTargetFPS(30);
 ui.setFrameAnimation(SLIDE_LEFT);
 ui.setFrames(frames, frameCount);
@@ -172,17 +179,22 @@ String webAddress = "http://" + WiFi.localIP().toString() + ":" + String(WEBSERV
 Serial.println("Use this URL : " + webAddress);
 MDNS.addService("http", "tcp", 80);
 
-display.clear();
-display.setTextAlignment(TEXT_ALIGN_CENTER);
-display.setFont(ArialMT_Plain_16);
-display.drawString(64, 30, WiFi.localIP().toString());
-display.drawString(64, 46, "Port: " + String(WEBSERVER_PORT));
-display.display();
+
 
 Serial.println ("DateTime: "+ String (daysOfTheWeek[timeClient.getDay()]) +" " + timeClient.getFormattedTime() );
 LittleFS.begin();
 
 updateConfig(readJsonSettings());
+
+display.clear();
+display.setTextAlignment(TEXT_ALIGN_CENTER);
+display.setFont(ArialMT_Plain_10);
+display.drawString(64, 0, "Planton v." + (String)VERSION); 
+display.drawString(64, 15, "Hello!"); 
+display.drawString(64, 25, WiFi.localIP().toString());
+display.drawString(64, 35, "Port: " + String(WEBSERVER_PORT));
+display.display();
+delay(3000);
 
 
 }// end setup()
@@ -397,14 +409,14 @@ void drawFrame1(OLEDDisplay *display, OLEDDisplayUiState* state, int16_t x, int1
   display->setTextAlignment(TEXT_ALIGN_LEFT);
   display->setFont(ArialMT_Plain_16);
   display->drawString(3 + x, 15 + y,"Temp: " + String (DHTtemp)+" °C");
-  display->drawString(3 + x, 35 + y,"Hum:  " + String (DHThum)+"  %");
+  display->drawString(3 + x, 35 + y,"Hum:   " + String (DHThum)+"  %");
 }
 
 void drawFrame2(OLEDDisplay *display, OLEDDisplayUiState* state, int16_t x, int16_t y) {
   display->setTextAlignment(TEXT_ALIGN_LEFT);
   display->setFont(ArialMT_Plain_16);
-  display->drawString(3 + x, 15 + y,"Soil Hum: " + String (SOILhum)+"%");
-  display->drawString(3 + x, 35 + y,"Lamp    : " + String(stateOUT ? "ON": "OFF"));
+  display->drawString(3 + x, 15 + y,"SoilHum:" + String (SOILhum)+"%");
+  display->drawString(3 + x, 35 + y,"L: " + String(stateOUT ? "ON": "OFF")+" | P: " + String(statePUMP ? "ON": "OFF"));
 }
 
 bool toBool(String value){ 

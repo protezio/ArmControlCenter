@@ -33,4 +33,4 @@ const int SoilhumMin = 250;
 #define JCONFIG "/json.txt"
 
 //Display
-#define INVERT_DISPLAY true
+#define INVERT_DISPLAY false
