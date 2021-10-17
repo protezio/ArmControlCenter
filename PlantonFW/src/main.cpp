@@ -4,6 +4,8 @@
 
 
 Ticker ticker;
+Ticker tickerPump;
+
 WiFiManager wifiManager;
 SSD1306Wire  display(OLED_Address, SDA_pin, SCL_pin);
 OLEDDisplayUi ui ( &display );
@@ -29,8 +31,10 @@ struct day
 char daysOfTheWeek[7][12] = {"Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"};
 day days[8];
 
-bool stateOUT;
-bool statePUMP;
+bool  stateOUT;
+bool  statePUMP;
+float percPUMP;
+bool  autoPUMP;
 long timeEpoch;
 long lastEpoch;
 
@@ -65,6 +69,13 @@ void tick()
   //toggle state
   int state = digitalRead(LED_BUILTIN);  // get the current state of GPIO1 pin
   digitalWrite(LED_BUILTIN, !state);     // set pin to the opposite state
+}
+
+void tickPump(){
+  if (autoPUMP)
+    statePUMP= !statePUMP;
+  else
+    statePUMP = false;
 }
 
 void configModeCallback (WiFiManager *myWiFiManager) {
@@ -122,6 +133,15 @@ wifiManager.setAPCallback(configModeCallback);
   };
 Serial.println("Connected...");
 
+if (!MDNS.begin("esp8266")) {
+    Serial.println("Error setting up MDNS responder!");
+    while (1) {
+      delay(1000);
+    }
+  }
+Serial.println("mDNS responder started");
+
+
 // time client init
 timeClient.begin();
 timeClient.update();
@@ -131,7 +151,7 @@ Serial.println(timeClient.getFormattedTime());
 dht.begin();
 
 // ticker attach
-ticker.attach(0.2, tick);
+ticker.attach(1, tick);
 
 // web server config 
 //server.on("/", WebStatus);
@@ -150,6 +170,8 @@ server.begin();
 Serial.println("Server started");
 String webAddress = "http://" + WiFi.localIP().toString() + ":" + String(WEBSERVER_PORT) + "/";
 Serial.println("Use this URL : " + webAddress);
+MDNS.addService("http", "tcp", 80);
+
 display.clear();
 display.setTextAlignment(TEXT_ALIGN_CENTER);
 display.setFont(ArialMT_Plain_16);
@@ -233,6 +255,10 @@ void handleJSONget(){
       stateOUT= toBool(doc["Lamp"]);
   if (doc.containsKey("Pump"))
       statePUMP= toBool(doc["Pump"]);
+  if (doc.containsKey("PercPump"))
+      percPUMP= toBool(doc["PercPump"]);
+  if (doc.containsKey("AutoPump"))
+      autoPUMP= toBool(doc["AutoPump"]);    
  server.send ( 200, "text/json", "{success:true}" );
 }
 
@@ -293,16 +319,18 @@ void updateConfig(String buf){
   Serial.println("\nUpdate Config");
   DynamicJsonDocument doc(1024);
   DeserializationError error = deserializeJson(doc, buf);
+  
   if (error){
     Serial.println("\nDeserializationError");
     return;
   }
-    
+  percPUMP = doc["PercPump"];
+  autoPUMP = doc["AutoPump"];
   for (int i = 0; i < 7; i++){
   days[i].isEnable = (bool)doc[String(i)][0];
   days[i].startHours =(String)doc[String(i)][1];
   days[i].stopHours = (String)doc[String(i)][2];
-  /*Serial.print("\nDay: " + String(i));
+  Serial.print("\nDay: " + String(i));
   Serial.print("\n Doc: ");
   Serial.print((String)doc[String(i)][0] + ",");
   Serial.print((String)doc[String(i)][1] + ",");
@@ -310,9 +338,9 @@ void updateConfig(String buf){
   Serial.print("\n System: ");
   Serial.print((String)days[i].isEnable + ",");
   Serial.print(days[i].startHours + ",");
-  Serial.print(days[i].stopHours);*/
+  Serial.print(days[i].stopHours);
   };
-  
+  Serial.println("PercPUMP:"+ (String)percPUMP);
 
 }
 
@@ -335,6 +363,22 @@ void Out(){
   if ((Hours>stopHours || (Hours == stopHours && Minute >= stopMins ))&& isEnable){
       stateOUT = false;
   }
+
+  if ((percPUMP>=SOILhum))
+  {
+      tickerPump.attach(10, tickPump);
+      tickPump();
+      
+  }else if ((percPUMP<=SOILhum))
+  {
+    tickerPump.detach();
+
+  }
+  
+  
+ /* Serial.println("autoPUMP: " + (String)autoPUMP);
+  Serial.println("percPump: " + (String) percPUMP);
+  Serial.println("soilHum: " + (String)SOILhum);*/
 
 }
 
