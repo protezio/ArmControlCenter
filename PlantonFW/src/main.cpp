@@ -210,6 +210,7 @@ void loop() {
       DHTtemp = dht.readTemperature(false);
       DHThum = dht.readHumidity();
       SoilRawValue = analogRead(SOIL_PIN);
+      Serial.println("SoilRAW: " + (String)SoilRawValue);
       SOILhum = map(SoilRawValue, SoilhumMin, SoilhumMax, 100.0, 0.0);
       Out();
       tick();
@@ -384,6 +385,7 @@ void Out(){
   }else if ((percPUMP<=SOILhum))
   {
     tickerPump.detach();
+    statePUMP=false;
 
   }
   

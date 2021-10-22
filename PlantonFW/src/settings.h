@@ -21,11 +21,11 @@
 #define LAMP_OUT D6
 #define PUMP_OUT D7
 #define SOIL_PIN A0
-const int SoilhumMax = 1024;
-const int SoilhumMin = 250;
+const int SoilhumMax = 690;
+const int SoilhumMin = 280;
 
 //WebServer
-#define WEBSERVER_ENABLED true
+#define WEBSERVER_ENABLED truea
 #define WEBSERVER_PORT  80
 
 //File 
